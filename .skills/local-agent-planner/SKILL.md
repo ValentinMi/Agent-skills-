@@ -75,7 +75,7 @@ Report the plan path, the number of tasks, and the suggested execution order. Of
 
 Explain these to yourself as you write — they're the reason for the format, not arbitrary rules.
 
-1. **One concern per task.** A task should be a single cohesive change — typically one file or one tightly-coupled pair (implementation + its test). A small model does one narrow thing well and flails when juggling several. When in doubt, split.
+1. **One concern per task — bias toward splitting.** A task should be a single cohesive change: one new module, one endpoint/route, one behaviour, or one tightly-coupled pair (implementation + its test). A small model's typical failure isn't writing bad code — it's *dropping a requirement when juggling several*. A task that says "add hashing AND a login route AND protect the list" is exactly where a weak model does two of three and silently skips the rest. So default to splitting: one route/behaviour per task, even when several land in the same file. Only bundle when the changes are trivial *and* share the exact same context. The cost of more tasks is near zero — they're cheap to generate and the executor reads only one at a time — and smaller tasks give sharper verification: when something breaks you know exactly which task failed. When in doubt, split.
 
 2. **Self-contained.** Everything needed to execute goes *in the task file*: the objective, the minimal context, exact file paths, the interface/contract to satisfy, what to do (not paste-ready code), and how to verify. The executor should never need the plan, other task files, or a broad codebase tour.
 
@@ -97,6 +97,17 @@ The default is **spec, not code**: the executor writes the implementation. Calib
 - **Narrow exception — paste-ready code:** only for a fragment that is genuinely tricky, security-sensitive, or has a non-obvious "one correct form" the small model is likely to get wrong (e.g. a subtle type-narrowing guard, a crypto call with specific parameters). Keep it to that fragment, and say why it's given verbatim. If you find yourself pasting whole files, step back — you're doing the executor's job.
 
 The test: *could a competent coder implement this exactly one way from what I wrote?* If yes, you've specified enough — stop there and let them code. If they'd have to guess at the interface or behaviour, add contract detail (not implementation).
+
+## When several tasks edit the same file
+
+Splitting by concern often means two or three tasks touch the *same* file in sequence (e.g. one file gets a new import, then a new route, then a wrapped handler). The executor runs them one at a time, so by the time it opens task 3, the file no longer looks like the original — tasks 1 and 2 already changed it.
+
+This is the easiest way to feed a small model stale, misleading context. Guard against it:
+
+- **Show the file as it will be when this task runs**, not the original. In "Context you need", describe or quote the *expected current state* after the prerequisite tasks — e.g. "after Task 02, `users.ts` already imports `bcrypt` and defines `SALT_ROUNDS`". Don't paste the pristine original if earlier tasks have moved it on.
+- **Anchor the edit unambiguously.** Say where the change goes relative to what's already there ("add the `/login` handler after `/register` and before `GET /`"), so the executor doesn't duplicate or clobber prior work.
+- **Order tasks so each builds cleanly on the last**, and state in each task what it can assume is already present (that's what "Depends on" is for).
+- If keeping the "current state" description in sync across three tasks becomes fiddly, that's a hint the split is too fine for this file — consider merging those specific edits back into one task.
 
 ## `plan.md` template
 
@@ -155,7 +166,9 @@ Keep chapters aligned 1:1 with tasks so `Plan reference: plan.md § Task NN` alw
 <The minimal slice of context required to do THIS task without reading anything
 else: the relevant existing code/signatures (quote the actual snippet if small),
 data shapes, and what previous tasks have already produced that you can rely on.
-This is what lets the executor work from this file alone.>
+This is what lets the executor work from this file alone. If earlier tasks edited
+this same file, describe its state AFTER those edits, not the original — see
+"When several tasks edit the same file".>
 
 ## Files
 - Create: `<path>`
