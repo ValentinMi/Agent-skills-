@@ -13,10 +13,12 @@ If the tasks are too big, too vague, or force the executor to reconstruct contex
 
 ## The two-model setup
 
-- **Planner (you):** big context, strong reasoning. You explore the codebase, make architectural decisions, and write the plan + tasks.
-- **Executor (local model):** narrow context, good at writing code from a precise spec. It opens **one task file at a time** and implements it.
+- **Planner (you):** big context, strong reasoning, but a *scarce* resource (limited quota). You explore the codebase, make the architectural and design decisions, and write the plan + task specs.
+- **Executor (local model):** narrow context, but a capable coder and effectively unlimited to run locally. It opens **one task file at a time** and **writes the actual code**.
 
-You do the thinking so the executor doesn't have to.
+The division of labour is the whole point: **you decide *what* to build and give clear technical direction; the executor writes the *how* (the code).** You are spending your scarce reasoning on decisions the small model can't make well — architecture, interfaces, sequencing, edge cases — and delegating the mechanical code-writing to the local model, which is cheap to run and good at it.
+
+So **write specs, not solutions.** Do not hand the executor finished, paste-ready implementations. If you write the whole function body, you've done the executor's job — burning your limited quota and wasting the local model. Instead, pin down the *contract* and the *constraints* precisely enough that a competent coder can only implement it one way, and let it write the code. (The exception is a genuinely tricky or security-sensitive fragment — see "How much to specify" below.)
 
 ## Output structure
 
@@ -75,15 +77,26 @@ Explain these to yourself as you write — they're the reason for the format, no
 
 1. **One concern per task.** A task should be a single cohesive change — typically one file or one tightly-coupled pair (implementation + its test). A small model does one narrow thing well and flails when juggling several. When in doubt, split.
 
-2. **Self-contained.** Everything needed to execute goes *in the task file*: the objective, the minimal context, exact file paths, the interfaces/signatures to implement, step-by-step instructions, and how to verify. The executor should never need the plan, other task files, or a broad codebase tour.
+2. **Self-contained.** Everything needed to execute goes *in the task file*: the objective, the minimal context, exact file paths, the interface/contract to satisfy, what to do (not paste-ready code), and how to verify. The executor should never need the plan, other task files, or a broad codebase tour.
 
-3. **Concrete over descriptive.** Give exact paths (`src/auth/jwt.ts`), exact signatures (`function signToken(userId: string): string`), and exact commands (`npm test -- auth`). "Add a function that signs tokens" forces the small model to invent an interface; give it the interface.
+3. **Specify the contract, not the implementation.** Pin down the boundary precisely — exact paths (`src/auth/jwt.ts`), exact signatures (`function signToken(userId: string): string`), exact routes/types/schemas, and exact commands (`npm test -- auth`) — because these are decisions the small model can't reliably make and must match across tasks. But stop at the boundary: describe *what the code must do and satisfy*, and let the executor write the body. "Add a function that signs tokens" is too vague (it must invent the interface); pasting the full function is too much (it does the executor's job). The sweet spot is the signature + the behaviour + the constraints.
 
-4. **Verifiable.** Every task ends with a checkable Definition of Done and a concrete verification command (test, build, lint, or a manual check). This lets the executor — and you — know the task actually succeeded before moving on.
+4. **Verifiable.** Every task ends with a checkable Definition of Done and a concrete verification command (test, build, lint, or a manual check). This lets the executor — and you — know the task actually succeeded before moving on. Verification matters *more* here precisely because the executor, not you, wrote the code: the verify step is how a weaker model catches its own mistakes.
 
 5. **Explicit dependencies and order.** Each task lists its prerequisites by ID. The executor runs them in order; a task can assume everything it depends on is already done, and should state what it can rely on being present.
 
 6. **Right-sized.** Aim for tasks a small model can finish in one focused pass. If a task's steps or context won't fit comfortably in a limited window, that's the signal to split it.
+
+## How much to specify (the code-vs-spec dial)
+
+The default is **spec, not code**: the executor writes the implementation. Calibrate what you provide like this:
+
+- **Always give (the contract):** exact file paths; function/class signatures, types, route shapes, schemas; expected inputs/outputs and status codes; error/edge-case behaviour; naming and which existing pattern to match. These are cross-task decisions the executor can't safely improvise.
+- **Give as *hints*, not full code:** which library/API to use and roughly how, the algorithm or sequence of operations in prose, a one- or two-line snippet to illustrate an existing pattern the executor should follow. A short illustrative snippet is fine; a complete solution is not.
+- **Let the executor write:** the actual function bodies, the wiring, the boilerplate — the mechanical code that follows unambiguously from the contract.
+- **Narrow exception — paste-ready code:** only for a fragment that is genuinely tricky, security-sensitive, or has a non-obvious "one correct form" the small model is likely to get wrong (e.g. a subtle type-narrowing guard, a crypto call with specific parameters). Keep it to that fragment, and say why it's given verbatim. If you find yourself pasting whole files, step back — you're doing the executor's job.
+
+The test: *could a competent coder implement this exactly one way from what I wrote?* If yes, you've specified enough — stop there and let them code. If they'd have to guess at the interface or behaviour, add contract detail (not implementation).
 
 ## `plan.md` template
 
@@ -148,14 +161,23 @@ This is what lets the executor work from this file alone.>
 - Create: `<path>`
 - Modify: `<path>` — <what changes>
 
-## Interface / contract
-<Exact signatures, types, function names, routes, schemas to implement. Be
-precise enough that there's no guessing. Use a code block.>
+## Contract (what your code must satisfy)
+<The boundary the executor implements *to* — NOT the implementation itself.
+Exact signatures, types, function/route names, schemas, expected inputs/outputs
+and status codes. Use a code block for signatures/types. Describe behaviour in
+prose. Do not write the function bodies — that's the executor's job.>
 
-## Steps
-1. <imperative step>
-2. <imperative step>
-3. <...>
+## What to do
+<Describe the work as instructions, not code: "hash the password with bcrypt
+(SALT_ROUNDS = 10) before storing", "look the user up by email, compare with
+bcrypt.compare, return 401 on mismatch". Name the library/API and the sequence
+of steps. Include a 1–2 line snippet ONLY to show an existing pattern to match.>
+
+## Technical hints
+<Optional. Pointers that save the executor time without doing its job: which
+helper to reuse, a gotcha in the API, the ESM `.js` import convention, a
+type-narrowing caveat. If a fragment is genuinely tricky/security-sensitive and
+has one correct form, you may give it verbatim here — and say why.>
 
 ## Constraints & gotchas
 <Anything easy to get wrong: edge cases, patterns to match, things NOT to touch,
@@ -175,6 +197,7 @@ imports to reuse, error handling expected.>
 ## Quality checklist before you finish
 
 - [ ] Every task reads as self-contained — no task requires the plan or a codebase tour to execute.
+- [ ] Tasks specify the contract and let the executor write the code — no paste-ready full implementations (except a justified tricky/security-sensitive fragment).
 - [ ] Every file path, signature, and command is real (verified against the codebase), not invented.
 - [ ] Each task is one concern and small enough for a limited-context model.
 - [ ] Dependencies are listed by ID and the order is consistent with them.
