@@ -5,216 +5,150 @@ description: Turn a feature request or coding task into a detailed implementatio
 
 # Local Agent Planner
 
-This skill helps a strong planning model (you, e.g. Claude Sonnet) act as an **architect** that breaks a coding task into a plan and a set of **small, self-contained task files** that a **weaker local model with limited context** (Qwen, a local Ollama model, etc.) can execute one at a time.
+You (a strong planner, e.g. Claude Sonnet) act as an **architect**: you break a coding task into a plan and a set of **small, self-contained task files** that a **weaker local model with limited context** (Qwen, Ollama, etc.) executes one at a time.
 
-The whole design turns on one constraint: **the executor is not you.** It is a small model that handles code well but gets lost with large context and can't reliably navigate a big document to find "the relevant part." So every task file must hand it exactly what it needs — no more, no less — to do one focused piece of work and verify it.
+The design turns on one constraint: **the executor is not you.** It's a small model — good at code, but lost in large context and unable to navigate a big document to find "the relevant part." So each task file hands it exactly what it needs, no more, to do one focused piece of work and verify it.
 
-If the tasks are too big, too vague, or force the executor to reconstruct context by reading the whole plan, the skill has failed. Keep that reader in mind the entire time.
+**Division of labour:** you decide *what* to build (architecture, interfaces, sequencing, edge cases) — decisions the small model can't make. The executor writes the *how* (the code). So **write specs, not solutions.** Pin down the *contract* precisely enough that a competent coder can implement it one way; let it write the body. Writing full function bodies burns your scarce quota and wastes the executor. (Exception: a genuinely tricky/security-sensitive fragment — see the dial below.)
 
-## The two-model setup
+## Economy is quality, not a trade-off
 
-- **Planner (you):** big context, strong reasoning, but a *scarce* resource (limited quota). You explore the codebase, make the architectural and design decisions, and write the plan + task specs.
-- **Executor (local model):** narrow context, but a capable coder and effectively unlimited to run locally. It opens **one task file at a time** and **writes the actual code**.
+Your tokens are the scarce resource — spend the fewest that still make each task unambiguous. This is not in tension with quality: a **shorter task file is also easier for the small model**, which gets lost in bulk. So the same discipline serves both goals.
 
-The division of labour is the whole point: **you decide *what* to build and give clear technical direction; the executor writes the *how* (the code).** You are spending your scarce reasoning on decisions the small model can't make well — architecture, interfaces, sequencing, edge cases — and delegating the mechanical code-writing to the local model, which is cheap to run and good at it.
-
-So **write specs, not solutions.** Do not hand the executor finished, paste-ready implementations. If you write the whole function body, you've done the executor's job — burning your limited quota and wasting the local model. Instead, pin down the *contract* and the *constraints* precisely enough that a competent coder can only implement it one way, and let it write the code. (The exception is a genuinely tricky or security-sensitive fragment — see "How much to specify" below.)
+- **A pointer beats a paste.** `src/auth/jwt.ts`, signature `signToken(userId: string): string` — ten tokens that fix the contract. Pasting the file costs hundreds and does the executor's job. Quote a snippet only when it's small and load-bearing.
+- **Write telegraphically.** Fragments, not sentences. Signatures over prose. Don't restate the objective in three places or explain your reasoning in the generated files — the executor needs the *what*, not the *why*.
+- **Split for correctness, not by reflex.** Each split duplicates context, so it costs tokens. Split when bundling risks the executor dropping a requirement (see principle 1); stop when a task is already one focused concern. Right-size beats max-split.
 
 ## Output structure
 
-Create this under the repo root:
-
 ```
 .opencode/plans/<plan-name>/
-├── plan.md          # overview, decisions, conventions, task index (dependencies + status)
+├── plan.md          # overview, decisions, conventions, task index
 └── tasks/
     ├── task-01-<slug>.md
-    ├── task-02-<slug>.md
     └── ...
 ```
 
-- `<plan-name>` is a short kebab-case name for the feature/change (e.g. `add-jwt-auth`, `refactor-cart-service`).
-- Task files are zero-padded and slugged so ordering is obvious: `task-01-create-user-model.md`.
-- All generated files are written in **English**.
+- `<plan-name>`: short kebab-case (e.g. `add-jwt-auth`). Task files zero-padded and slugged. All files in **English**.
 
 ## Workflow
 
-### 1. Understand and explore first — never plan in the abstract
-
-The single biggest quality lever is grounding the plan in the **real** codebase. Before writing anything:
-
-- Read the relevant existing files. Note exact paths, function/class signatures, types, and patterns already in use.
-- Identify the project's conventions: language/framework, how tests are run, how to build/lint, directory layout, naming style.
-- Figure out the real seams where the change lands.
-
-A small executor model cannot discover this itself reliably. Anything you don't pin down now, it will guess — usually wrong. So every file path, signature, and command you put in a task should be one you actually verified, not invented.
-
-If the request is ambiguous in a way that changes the plan, ask the user before writing files.
-
-### 2. Name the plan and create the folders
-
-Pick `<plan-name>`, then create `.opencode/plans/<plan-name>/tasks/`.
-
-### 3. Write `plan.md`
-
-Use the template below. `plan.md` is the human/architect view and the source of truth for ordering and decisions. It is **not** required reading for the executor on any single task — the task files stand on their own.
-
-### 4. Write the task files
-
-One file per task, using the task template below. This is where the skill earns its keep. Each task must be **self-contained**: the executor should be able to complete it by reading only that one file. Include a pointer back to the matching `plan.md` chapter as a fallback (`Plan reference: plan.md § Task 3`), but never rely on the executor following it.
-
-### 5. Review pass — read each task as if you were the small model
-
-Re-open each task file and ask: "If I had never seen the plan or the codebase overview, could I do exactly this and know when I'm done?" Fix anything that fails that test. This pass matters more than the first draft.
-
-### 6. Tell the user
-
-Report the plan path, the number of tasks, and the suggested execution order. Offer to adjust granularity.
+1. **Explore first — never plan in the abstract.** Read the real files. Note exact paths, signatures, types, conventions (language, test/build/lint commands, layout, naming), and the seams where the change lands. Anything you don't pin down, the executor will guess — usually wrong. Every path/signature/command you write must be one you verified. If the request is ambiguous in a way that changes the plan, ask before writing.
+2. **Name the plan, create `.opencode/plans/<plan-name>/tasks/`.**
+3. **Write `plan.md`** (template below) — the architect's source of truth for ordering/decisions. Not required reading for the executor.
+4. **Write the task files** (template below). Each is **self-contained**: executable from that one file alone. Add `Plan reference: plan.md § Task NN` as a fallback pointer, but never rely on the executor following it.
+5. **Review pass — read each task as the small model.** "With no plan and no codebase knowledge, could I do exactly this and know when I'm done?" Fix what fails. This matters more than the first draft.
+6. **Tell the user** the plan path, task count, and execution order. Offer to adjust granularity.
 
 ## Design principles for tasks
 
-Explain these to yourself as you write — they're the reason for the format, not arbitrary rules.
+1. **One concern per task.** One module, one route/behaviour, or one tightly-coupled pair (impl + its test). The small model's typical failure isn't bad code — it's *dropping a requirement while juggling several*. "Add hashing AND a login route AND protect the list" is where it does two of three and silently skips one. So bundle only trivial changes that share the exact same context; otherwise one behaviour per task. Smaller tasks also give sharper verification — when something breaks you know which task.
+2. **Self-contained.** Everything to execute goes in the task file: objective, minimal context, exact paths, contract, what to do (not paste-ready code), how to verify. Never needs the plan or a codebase tour.
+3. **Contract, not implementation.** Pin the boundary exactly — paths, signatures, routes, types, schemas, commands — because the executor can't safely improvise these and they must match across tasks. Then stop: describe *what the code must do*, let it write the body. Signature + behaviour + constraints is the sweet spot.
+4. **Verifiable.** Every task ends with a checkable Definition of Done and a concrete verify command. The executor wrote the code, not you — the verify step is how a weaker model catches its own mistakes.
+5. **Explicit dependencies.** Each task lists prerequisites by ID and states what it can assume is already present.
+6. **Right-sized.** Fits one focused pass of a limited window. If context or steps won't fit comfortably, split.
 
-1. **One concern per task — bias toward splitting.** A task should be a single cohesive change: one new module, one endpoint/route, one behaviour, or one tightly-coupled pair (implementation + its test). A small model's typical failure isn't writing bad code — it's *dropping a requirement when juggling several*. A task that says "add hashing AND a login route AND protect the list" is exactly where a weak model does two of three and silently skips the rest. So default to splitting: one route/behaviour per task, even when several land in the same file. Only bundle when the changes are trivial *and* share the exact same context. The cost of more tasks is near zero — they're cheap to generate and the executor reads only one at a time — and smaller tasks give sharper verification: when something breaks you know exactly which task failed. When in doubt, split.
+## The code-vs-spec dial
 
-2. **Self-contained.** Everything needed to execute goes *in the task file*: the objective, the minimal context, exact file paths, the interface/contract to satisfy, what to do (not paste-ready code), and how to verify. The executor should never need the plan, other task files, or a broad codebase tour.
+Default is **spec, not code**. Calibrate:
 
-3. **Specify the contract, not the implementation.** Pin down the boundary precisely — exact paths (`src/auth/jwt.ts`), exact signatures (`function signToken(userId: string): string`), exact routes/types/schemas, and exact commands (`npm test -- auth`) — because these are decisions the small model can't reliably make and must match across tasks. But stop at the boundary: describe *what the code must do and satisfy*, and let the executor write the body. "Add a function that signs tokens" is too vague (it must invent the interface); pasting the full function is too much (it does the executor's job). The sweet spot is the signature + the behaviour + the constraints.
+- **Always give (the contract):** exact paths; signatures, types, route shapes, schemas; inputs/outputs and status codes; error/edge behaviour; which existing pattern to match.
+- **Give as hints:** which library/API and roughly how; the algorithm in prose; a 1–2 line snippet showing an existing pattern. Illustrative, not a full solution.
+- **Let the executor write:** function bodies, wiring, boilerplate — whatever follows unambiguously from the contract.
+- **Verbatim exception:** only a fragment that's genuinely tricky/security-sensitive with one correct form (a subtle type guard, a crypto call with specific params). Keep it to that fragment and say why. Pasting whole files means you're doing the executor's job.
 
-4. **Verifiable.** Every task ends with a checkable Definition of Done and a concrete verification command (test, build, lint, or a manual check). This lets the executor — and you — know the task actually succeeded before moving on. Verification matters *more* here precisely because the executor, not you, wrote the code: the verify step is how a weaker model catches its own mistakes.
-
-5. **Explicit dependencies and order.** Each task lists its prerequisites by ID. The executor runs them in order; a task can assume everything it depends on is already done, and should state what it can rely on being present.
-
-6. **Right-sized.** Aim for tasks a small model can finish in one focused pass. If a task's steps or context won't fit comfortably in a limited window, that's the signal to split it.
-
-## How much to specify (the code-vs-spec dial)
-
-The default is **spec, not code**: the executor writes the implementation. Calibrate what you provide like this:
-
-- **Always give (the contract):** exact file paths; function/class signatures, types, route shapes, schemas; expected inputs/outputs and status codes; error/edge-case behaviour; naming and which existing pattern to match. These are cross-task decisions the executor can't safely improvise.
-- **Give as *hints*, not full code:** which library/API to use and roughly how, the algorithm or sequence of operations in prose, a one- or two-line snippet to illustrate an existing pattern the executor should follow. A short illustrative snippet is fine; a complete solution is not.
-- **Let the executor write:** the actual function bodies, the wiring, the boilerplate — the mechanical code that follows unambiguously from the contract.
-- **Narrow exception — paste-ready code:** only for a fragment that is genuinely tricky, security-sensitive, or has a non-obvious "one correct form" the small model is likely to get wrong (e.g. a subtle type-narrowing guard, a crypto call with specific parameters). Keep it to that fragment, and say why it's given verbatim. If you find yourself pasting whole files, step back — you're doing the executor's job.
-
-The test: *could a competent coder implement this exactly one way from what I wrote?* If yes, you've specified enough — stop there and let them code. If they'd have to guess at the interface or behaviour, add contract detail (not implementation).
+Test: *could a competent coder implement this exactly one way from what I wrote?* Yes → stop. No → add contract detail, not implementation.
 
 ## When several tasks edit the same file
 
-Splitting by concern often means two or three tasks touch the *same* file in sequence (e.g. one file gets a new import, then a new route, then a wrapped handler). The executor runs them one at a time, so by the time it opens task 3, the file no longer looks like the original — tasks 1 and 2 already changed it.
+Splitting by concern often means 2–3 tasks touch the same file in sequence. By the time the executor opens task 3, tasks 1–2 already changed the file — the easiest way to feed it stale context. Guard against it:
 
-This is the easiest way to feed a small model stale, misleading context. Guard against it:
-
-- **Show the file as it will be when this task runs**, not the original. In "Context you need", describe or quote the *expected current state* after the prerequisite tasks — e.g. "after Task 02, `users.ts` already imports `bcrypt` and defines `SALT_ROUNDS`". Don't paste the pristine original if earlier tasks have moved it on.
-- **Anchor the edit unambiguously.** Say where the change goes relative to what's already there ("add the `/login` handler after `/register` and before `GET /`"), so the executor doesn't duplicate or clobber prior work.
-- **Order tasks so each builds cleanly on the last**, and state in each task what it can assume is already present (that's what "Depends on" is for).
-- If keeping the "current state" description in sync across three tasks becomes fiddly, that's a hint the split is too fine for this file — consider merging those specific edits back into one task.
+- **Describe the file's state *after* the prerequisite tasks**, not the original (e.g. "after Task 02, `users.ts` imports `bcrypt` and defines `SALT_ROUNDS`").
+- **Anchor the edit** relative to what's there ("add `/login` after `/register`, before `GET /`") so the executor doesn't clobber prior work.
+- If keeping the "current state" in sync across three tasks gets fiddly, the split is too fine — merge those edits.
 
 ## `plan.md` template
 
 ```markdown
-# Plan: <Human-readable title>
+# Plan: <title>
 
 ## Goal
-<1–3 sentences: what we're building/changing and why.>
+<1–3 sentences: what and why.>
 
 ## Current state
-<Brief: the relevant existing code, its shape, and where the change lands. Real paths.>
+<Relevant existing code, its shape, where the change lands. Real paths.>
 
 ## Approach & key decisions
-<The chosen strategy and any decisions the executor must respect — data shapes,
-patterns to follow, libraries to use, things to avoid. Bullet points.>
+<Strategy and decisions the executor must respect — data shapes, patterns,
+libraries, things to avoid. Bullets.>
 
-## Conventions (apply to every task)
-- Language / framework: <e.g. TypeScript, Node 20>
-- Run tests: `<command>`
-- Build: `<command>`
-- Lint / format: `<command>`
-- Other: <naming, file layout, error-handling patterns, etc.>
+## Conventions (every task)
+- Language / framework: <...>
+- Run tests / build / lint: `<commands>`
+- Other: <naming, layout, error handling>
 
 ## Task index
 | ID | Task | Depends on | Status |
 |----|------|-----------|--------|
 | 01 | <title> | — | [ ] |
 | 02 | <title> | 01 | [ ] |
-| 03 | <title> | 01, 02 | [ ] |
 
 ## Task 01 — <title>
-<A short chapter (a few sentences to a paragraph) describing this task's slice of
-the work in prose. This is the fallback detail a task file points back to. Keep
-each chapter focused on one task so a task can reference "§ Task 01" alone.>
-
-## Task 02 — <title>
-<...>
+<A few sentences on this task's slice — the fallback detail its task file points
+back to. One chapter per task, so "§ Task NN" points at exactly one slice.>
 ```
 
-Keep chapters aligned 1:1 with tasks so `Plan reference: plan.md § Task NN` always points at exactly the right slice.
-
 ## Task file template
+
+Write it terse — fragments and signatures, not paragraphs. Omit any section that adds nothing for a given task (a task creating one file needs no "same-file" note).
 
 ````markdown
 # Task 01 — <title>
 
-- **ID:** 01
-- **Depends on:** <task IDs, or "none">
-- **Plan reference:** plan.md § Task 01
-- **Status:** todo
+- **ID:** 01 · **Depends on:** <IDs or none> · **Plan ref:** plan.md § Task 01 · **Status:** todo
 
 ## Objective
-<1–2 sentences: what this task accomplishes.>
+<1 sentence.>
 
-## Context you need
-<The minimal slice of context required to do THIS task without reading anything
-else: the relevant existing code/signatures (quote the actual snippet if small),
-data shapes, and what previous tasks have already produced that you can rely on.
-This is what lets the executor work from this file alone. If earlier tasks edited
-this same file, describe its state AFTER those edits, not the original — see
-"When several tasks edit the same file".>
+## Context
+<Minimal slice to do THIS task alone: relevant signatures (quote only if small),
+data shapes, what prior tasks produced that you rely on. If earlier tasks edited
+this file, describe its state AFTER those edits.>
 
 ## Files
-- Create: `<path>`
-- Modify: `<path>` — <what changes>
+- Create/Modify: `<path>` — <what changes>
 
-## Contract (what your code must satisfy)
-<The boundary the executor implements *to* — NOT the implementation itself.
-Exact signatures, types, function/route names, schemas, expected inputs/outputs
-and status codes. Use a code block for signatures/types. Describe behaviour in
-prose. Do not write the function bodies — that's the executor's job.>
+## Contract
+<The boundary to implement TO, not the implementation. Exact signatures, types,
+routes, schemas, inputs/outputs, status codes. Code block for signatures. Behaviour
+in prose. No function bodies.>
 
 ## What to do
-<Describe the work as instructions, not code: "hash the password with bcrypt
-(SALT_ROUNDS = 10) before storing", "look the user up by email, compare with
-bcrypt.compare, return 401 on mismatch". Name the library/API and the sequence
-of steps. Include a 1–2 line snippet ONLY to show an existing pattern to match.>
-
-## Technical hints
-<Optional. Pointers that save the executor time without doing its job: which
-helper to reuse, a gotcha in the API, the ESM `.js` import convention, a
-type-narrowing caveat. If a fragment is genuinely tricky/security-sensitive and
-has one correct form, you may give it verbatim here — and say why.>
-
-## Constraints & gotchas
-<Anything easy to get wrong: edge cases, patterns to match, things NOT to touch,
-imports to reuse, error handling expected.>
+<Instructions, not code: "hash with bcrypt (SALT_ROUNDS=10) before storing", "look
+up by email, bcrypt.compare, 401 on mismatch". Name the API and the steps. A 1–2
+line snippet ONLY to show a pattern to match. Fold in gotchas/constraints here —
+edge cases, what NOT to touch, imports to reuse. A verbatim fragment goes here only
+if genuinely tricky/security-sensitive; say why.>
 
 ## Definition of Done
-- [ ] <objective, checkable outcome>
-- [ ] <another>
-- [ ] Verification command passes (below)
+- [ ] <checkable outcome>
+- [ ] Verify command passes
 
 ## Verify
 ```bash
-<exact command to prove the task works, e.g. `npm test -- auth/jwt`>
+<exact command, e.g. npm test -- auth/jwt>
 ```
 ````
 
-## Quality checklist before you finish
+## Before you finish
 
-- [ ] Every task reads as self-contained — no task requires the plan or a codebase tour to execute.
-- [ ] Tasks specify the contract and let the executor write the code — no paste-ready full implementations (except a justified tricky/security-sensitive fragment).
-- [ ] Every file path, signature, and command is real (verified against the codebase), not invented.
-- [ ] Each task is one concern and small enough for a limited-context model.
-- [ ] Dependencies are listed by ID and the order is consistent with them.
-- [ ] Each task has a concrete Definition of Done and a verification command.
-- [ ] `plan.md` chapters map 1:1 to task files.
-- [ ] The user has been told the plan location and execution order.
-```
+- [ ] Each task is self-contained — no plan or codebase tour needed to execute.
+- [ ] Contract specified, body left to the executor — no paste-ready implementations (bar a justified tricky fragment).
+- [ ] Every path, signature, and command is real, not invented.
+- [ ] One concern per task, right-sized for a limited window; splits justified by correctness, not reflex.
+- [ ] Dependencies by ID; order consistent.
+- [ ] Each task has a Definition of Done and a verify command.
+- [ ] plan.md chapters map 1:1 to task files.
+- [ ] Task files are terse — pointers over pastes, no restated rationale.
+- [ ] User told the plan location and execution order.
