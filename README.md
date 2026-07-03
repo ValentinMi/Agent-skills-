@@ -26,3 +26,16 @@ Un workflow à deux modèles pour économiser un modèle fort et exploiter un mo
 - [`local-agent-executor`](.skills/local-agent-executor/SKILL.md) — un petit modèle local (Qwen sur OpenCode) implémente ces tâches **une par une**, sans jamais charger tout le plan, pour garder son contexte/RAM léger.
 
 Chaque nouveau skill créé avec `skill-creator` doit être ajouté dans `.skills/<nom>/` **avec son symlink** `.claude/skills/<nom>`.
+
+## Installer / mettre à jour les skills ailleurs
+
+`install-skills.sh` copie les skills du repo vers un dossier de skills cible (OpenCode, `.claude/skills` d'un projet, etc.). Ré-exécuter met à jour : chaque skill est **mis en miroir** (les fichiers supprimés d'un skill le sont aussi dans la cible) ; les `__pycache__`/`*.pyc` ne sont jamais copiés.
+
+```bash
+./install-skills.sh <dossier-cible>                       # tous les skills
+./install-skills.sh <dossier-cible> local-agent-executor  # un skill précis
+
+# exemples
+./install-skills.sh ~/.config/opencode/skills
+./install-skills.sh ../mon-projet/.claude/skills local-agent-planner local-agent-executor
+```
