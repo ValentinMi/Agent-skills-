@@ -10,7 +10,8 @@ Chaque skill vit dans `.skills/<nom>/` (source de vérité) et est exposé à Cl
 .skills/
 ├── skill-creator/          # méta-skill Anthropic : créer, tester, optimiser des skills
 ├── local-agent-planner/    # Sonnet planifie → plan + tâches granulaires
-└── local-agent-executor/   # l'agent local (Qwen/OpenCode) exécute les tâches une par une
+├── local-agent-executor/   # l'agent local (Qwen/OpenCode) exécute les tâches une par une
+└── local-agent-reviewer/   # relit le diff d'une tâche vs sa spec avant de la marquer done
 ```
 
 ### skill-creator
@@ -18,12 +19,15 @@ Chaque skill vit dans `.skills/<nom>/` (source de vérité) et est exposé à Cl
 Le [`skill-creator`](.skills/skill-creator/SKILL.md) officiel d'Anthropic : créer un skill de zéro, améliorer un skill existant, lancer des évaluations, optimiser la description (triggering), packager en `.skill`.
 Source : [anthropics/skills](https://github.com/anthropics/skills/tree/main/skills/skill-creator).
 
-### local-agent-planner + local-agent-executor (paire)
+### local-agent-planner + executor + reviewer (workflow)
 
 Un workflow à deux modèles pour économiser un modèle fort et exploiter un modèle local :
 
 - [`local-agent-planner`](.skills/local-agent-planner/SKILL.md) — un modèle fort (Claude Sonnet) découpe une tâche de code en un `plan.md` + des fiches de tâches **auto-suffisantes** sous `.opencode/plans/<nom>/`. Les tâches donnent le *contrat + les indications*, pas le code clé en main.
 - [`local-agent-executor`](.skills/local-agent-executor/SKILL.md) — un petit modèle local (Qwen sur OpenCode) implémente ces tâches **une par une**, sans jamais charger tout le plan, pour garder son contexte/RAM léger.
+- [`local-agent-reviewer`](.skills/local-agent-reviewer/SKILL.md) — relit le **diff d'une tâche** face à sa spec (Contract, Definition of Done, Constraints) avant de la marquer done, et rend un verdict *APPROVE* / *CHANGES NEEDED*. Contexte léger : uniquement le diff courant + le fichier de tâche, jamais tout le plan.
+
+Boucle par tâche : **planifier → exécuter → vérifier → relire → marquer done**.
 
 Chaque nouveau skill créé avec `skill-creator` doit être ajouté dans `.skills/<nom>/` **avec son symlink** `.claude/skills/<nom>`.
 
