@@ -2,7 +2,7 @@
 #
 # install-skills.sh — install or update this repo's skills into a target folder.
 #
-# Copies each skill from .skills/<name>/ into <target-dir>/<name>/. Running it
+# Copies each skill from skills/<name>/ into <target-dir>/<name>/. Running it
 # again updates an existing install (each skill folder is mirrored exactly, so
 # files removed from a skill are also removed from the target). __pycache__ and
 # *.pyc are never copied.
@@ -18,7 +18,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILLS_SRC="$SCRIPT_DIR/.skills"
+SKILLS_SRC="$SCRIPT_DIR/skills"
 
 usage() {
   # Print the comment header (everything after the shebang up to the first
@@ -33,7 +33,7 @@ case "$1" in -h|--help) usage 0 ;; esac
 TARGET_DIR="$1"; shift
 [ -d "$SKILLS_SRC" ] || { echo "error: source skills dir not found: $SKILLS_SRC" >&2; exit 1; }
 
-# Determine which skills to install: the named ones, or every skill in .skills/.
+# Determine which skills to install: the named ones, or every skill in skills/.
 declare -a SKILLS=()
 if [ $# -gt 0 ]; then
   SKILLS=("$@")

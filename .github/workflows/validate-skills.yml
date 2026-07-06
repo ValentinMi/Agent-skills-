@@ -17,39 +17,46 @@ jobs:
       - name: Install dependencies
         run: pip install pyyaml
 
-      - name: Validate each skill's frontmatter
+      - name: Validate each shipped skill's frontmatter (skills/)
         run: |
           set -euo pipefail
           failed=0
-          for d in .skills/*/; do
+          for d in skills/*/; do
             name="$(basename "$d")"
             [ -f "${d}SKILL.md" ] || continue
             echo "Validating $name..."
-            if ! (cd .skills/skill-creator && python -m scripts.quick_validate "../$name"); then
+            if ! (cd .claude/skills/skill-creator && python -m scripts.quick_validate "../../../skills/$name"); then
               echo "::error::$name failed validation"
               failed=1
             fi
           done
           exit "$failed"
 
-      - name: Check discovery symlinks
+      - name: Validate skill-creator itself (.claude/skills/)
+        run: |
+          cd .claude/skills/skill-creator
+          python -m scripts.quick_validate .
+
+      - name: Check the two-tier architecture holds
         run: |
           set -euo pipefail
           failed=0
-          for d in .skills/*/; do
-            name="$(basename "$d")"
-            [ -f "${d}SKILL.md" ] || continue
-            link=".claude/skills/$name"
-            if [ ! -L "$link" ]; then
-              echo "::error::$link is missing or not a symlink"
-              failed=1
-              continue
-            fi
-            src_real="$(realpath "$d")"
-            link_real="$(realpath "$link")"
-            if [ "$src_real" != "$link_real" ]; then
-              echo "::error::$link resolves to $link_real, expected $src_real"
-              failed=1
-            fi
-          done
+
+          # skills/ is the distributable library: no symlinks in there.
+          if find skills -type l | grep -q .; then
+            echo "::error::skills/ must contain no symlinks (it's the distributable library, not a discovery tree)"
+            failed=1
+          fi
+
+          # .claude/skills/ is dev-tooling for this repo: only skill-creator, and not a symlink.
+          entries="$(find .claude/skills -mindepth 1 -maxdepth 1 -printf '%f\n' | sort)"
+          if [ "$entries" != "skill-creator" ]; then
+            echo "::error::.claude/skills/ must contain exactly one entry (skill-creator), found: $entries"
+            failed=1
+          fi
+          if [ -L .claude/skills/skill-creator ]; then
+            echo "::error::.claude/skills/skill-creator must be real files, not a symlink"
+            failed=1
+          fi
+
           exit "$failed"
