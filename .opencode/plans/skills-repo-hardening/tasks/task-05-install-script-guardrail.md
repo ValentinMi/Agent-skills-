@@ -1,6 +1,6 @@
 # Task 05 — install-skills.sh: refuse to overwrite its own source
 
-- **ID:** 05 · **Depends on:** none · **Plan ref:** plan.md § Task 05 · **Status:** todo
+- **ID:** 05 · **Depends on:** none · **Plan ref:** plan.md § Task 05 · **Status:** done
 
 ## Objective
 Make `install-skills.sh` refuse to install when the destination resolves to the source, instead of rsyncing `.skills/<name>/` onto itself through a symlink.

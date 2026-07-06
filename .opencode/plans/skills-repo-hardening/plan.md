@@ -27,11 +27,11 @@ Fix consistency bugs found in review: the three `local-agent-*` skills reference
 ## Task index
 | ID | Task | Depends on | Status |
 |----|------|-----------|--------|
-| 01 | Align task-file section names across the three skills | — | [ ] |
-| 02 | Executor: reviewer gate + single-plan task discovery | 01 | [ ] |
-| 03 | CLAUDE.md: document all four skills | — | [ ] |
-| 04 | CI workflow validating skills and symlinks | — | [ ] |
-| 05 | install-skills.sh: refuse to overwrite its own source | — | [ ] |
+| 01 | Align task-file section names across the three skills | — | [x] |
+| 02 | Executor: reviewer gate + single-plan task discovery | 01 | [x] |
+| 03 | CLAUDE.md: document all four skills | — | [x] |
+| 04 | CI workflow validating skills and symlinks | — | [x] |
+| 05 | install-skills.sh: refuse to overwrite its own source | — | [x] |
 
 ## Task 01 — Align task-file section names
 The planner's compressed template renamed sections but executor/reviewer (and one line of the planner itself) still use the old names. Pure mechanical rename in three SKILL.md files: `Context you need` → `Context`, `Plan reference` → `Plan ref`, and `Constraints & gotchas` → rephrased as constraints folded into `What to do`.

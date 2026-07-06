@@ -1,6 +1,6 @@
 # Task 01 — Align task-file section names across the three skills
 
-- **ID:** 01 · **Depends on:** none · **Plan ref:** plan.md § Task 01 · **Status:** todo
+- **ID:** 01 · **Depends on:** none · **Plan ref:** plan.md § Task 01 · **Status:** done
 
 ## Objective
 Make executor and reviewer reference the exact section names the planner's task template emits: `Context`, `What to do` (constraints folded in), `Plan ref`.

@@ -1,6 +1,6 @@
 # Task 02 — Executor: reviewer gate + single-plan task discovery
 
-- **ID:** 02 · **Depends on:** 01 · **Plan ref:** plan.md § Task 02 · **Status:** todo
+- **ID:** 02 · **Depends on:** 01 · **Plan ref:** plan.md § Task 02 · **Status:** done
 
 ## Objective
 Two edits in `.skills/local-agent-executor/SKILL.md`: step 7 of "The loop" gains an optional reviewer gate, and the "find next task" snippet targets one plan folder instead of every plan.

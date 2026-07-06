@@ -1,6 +1,6 @@
 # Task 04 — CI workflow validating skills and symlinks
 
-- **ID:** 04 · **Depends on:** none · **Plan ref:** plan.md § Task 04 · **Status:** todo
+- **ID:** 04 · **Depends on:** none · **Plan ref:** plan.md § Task 04 · **Status:** done
 
 ## Objective
 Add a GitHub Actions workflow that fails if any skill's frontmatter is invalid or any skill lacks its discovery symlink.

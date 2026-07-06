@@ -47,6 +47,11 @@ fi
 mkdir -p "$TARGET_DIR"
 TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"  # normalize to absolute
 
+if [ "$(realpath "$TARGET_DIR")" = "$(realpath "$SKILLS_SRC")" ]; then
+  echo "error: target dir ($TARGET_DIR) is the skills source dir ($SKILLS_SRC) — refusing to install onto itself" >&2
+  exit 1
+fi
+
 have_rsync=0; command -v rsync >/dev/null 2>&1 && have_rsync=1
 
 sync_one() {
@@ -71,6 +76,11 @@ for name in "${SKILLS[@]}"; do
   dst="$TARGET_DIR/$name"
   if [ ! -f "$src/SKILL.md" ]; then
     echo "  ✗ $name — not found in $SKILLS_SRC (skipped)" >&2
+    failed=$((failed + 1))
+    continue
+  fi
+  if [ -e "$dst" ] && [ "$(realpath "$dst")" = "$(realpath "$src")" ]; then
+    echo "  ✗ $name — target resolves to source (symlink?), skipped" >&2
     failed=$((failed + 1))
     continue
   fi

@@ -1,6 +1,6 @@
 # Task 03 — CLAUDE.md: document all four skills
 
-- **ID:** 03 · **Depends on:** none · **Plan ref:** plan.md § Task 03 · **Status:** todo
+- **ID:** 03 · **Depends on:** none · **Plan ref:** plan.md § Task 03 · **Status:** done
 
 ## Objective
 Replace the outdated `## The two skills` section of `CLAUDE.md` with one covering all four skills and the per-task workflow loop.

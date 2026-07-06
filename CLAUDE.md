@@ -45,10 +45,14 @@ The authoritative check catches both — run it after any frontmatter edit:
 cd .skills/skill-creator && python -m scripts.quick_validate <path-to-skill>   # prints "Skill is valid!"
 ```
 
-## The two skills
+## The skills
 
 - **`skill-creator`** — Anthropic's meta-skill for authoring, evaluating, and optimizing other skills (imported verbatim from anthropics/skills; contains Python tooling). Invoke it whenever creating or improving a skill.
 - **`local-agent-planner`** — turns a strong planner (Claude Sonnet) into an architect that writes a `plan.md` plus small, self-contained task specs under `.opencode/plans/<name>/` for a low-context **local** model (Qwen/Ollama) to implement one at a time. Tasks specify the *contract + hints*, not paste-ready code.
+- **`local-agent-executor`** — the small local model (Qwen/Ollama on OpenCode) implements the tasks of a plan under `.opencode/plans/` one at a time, one task per fresh context, never loading the whole plan.
+- **`local-agent-reviewer`** — reviews one task's diff against that task's own spec before it is marked done; verdict APPROVE / CHANGES NEEDED; reads only the diff plus the task file.
+
+Per-task loop: **plan → execute → verify → review → mark done**.
 
 ## skill-creator tooling
 

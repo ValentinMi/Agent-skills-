@@ -36,7 +36,7 @@ Your tokens are the scarce resource — spend the fewest that still make each ta
 1. **Explore first — never plan in the abstract.** Read the real files. Note exact paths, signatures, types, conventions (language, test/build/lint commands, layout, naming), and the seams where the change lands. Anything you don't pin down, the executor will guess — usually wrong. Every path/signature/command you write must be one you verified. If the request is ambiguous in a way that changes the plan, ask before writing.
 2. **Name the plan, create `.opencode/plans/<plan-name>/tasks/`.**
 3. **Write `plan.md`** (template below) — the architect's source of truth for ordering/decisions. Not required reading for the executor.
-4. **Write the task files** (template below). Each is **self-contained**: executable from that one file alone. Add `Plan reference: plan.md § Task NN` as a fallback pointer, but never rely on the executor following it.
+4. **Write the task files** (template below). Each is **self-contained**: executable from that one file alone. Add `Plan ref: plan.md § Task NN` as a fallback pointer, but never rely on the executor following it.
 5. **Review pass — read each task as the small model.** "With no plan and no codebase knowledge, could I do exactly this and know when I'm done?" Fix what fails. This matters more than the first draft.
 6. **Tell the user** the plan path, task count, and execution order. Offer to adjust granularity.
 
