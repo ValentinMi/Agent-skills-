@@ -15,26 +15,26 @@ Repeat this for each task, from lowest number to highest:
 
 1. **Find the next task.** In `tasks/`, files are numbered (`task-01-...`, `task-02-...`). Pick the lowest-numbered one whose `Status` is not `done`.
 2. **Open only that one task file.** Read it fully — it is small by design.
-3. **Do not open `plan.md` or any other task file.** Everything you need is in this task's `Context you need`, `Contract`, and `What to do`. Only if you are genuinely stuck, open the single section named in `Plan reference` — never the whole plan.
+3. **Do not open `plan.md` or any other task file.** Everything you need is in this task's `Context`, `Contract`, and `What to do`. Only if you are genuinely stuck, open the single section named in `Plan ref` — never the whole plan.
 4. **Check `Depends on`.** Those tasks are already done and their code is on disk. If you need to see what they produced, open that specific **source file**, not its task file.
-5. **Write the code** to satisfy the `Contract` and `What to do`. Respect `Constraints & gotchas`.
+5. **Write the code** to satisfy the `Contract` and `What to do`. Respect the constraints and gotchas folded into `What to do`.
 6. **Run the `Verify` command.** If it fails, fix it within this task and re-run until it passes.
-7. **Mark the task done.** Tick the `Definition of Done` boxes and set the task's `Status` to `done`.
+7. **Mark the task done.** If the workflow uses `local-agent-reviewer`, request its review of this task's diff first — only mark `done` on an **APPROVE** verdict; on **CHANGES NEEDED**, apply the fixes, re-run `Verify`, and get re-reviewed. Otherwise, tick the `Definition of Done` boxes and set the task's `Status` to `done` directly.
 8. **Stop and reset.** Start the next task in a **fresh context** — don't carry this task's file or transcript forward.
 
 ## Keep your context light (the RAM rule)
 
 - **One task = one clean context.** Between tasks, drop everything: the previous task file, its output, and the plan. Begin the next task fresh.
-- **Never bulk-read** all the tasks or the whole `plan.md` "to get the big picture." The planner already distilled the big picture into each task's `Context you need`. Reading more just fills your memory and slows you down — it does not make the current task easier.
+- **Never bulk-read** all the tasks or the whole `plan.md` "to get the big picture." The planner already distilled the big picture into each task's `Context`. Reading more just fills your memory and slows you down — it does not make the current task easier.
 - **The source of truth for what already exists is the code on disk**, not your memory of earlier tasks. When in doubt, read the one relevant source file.
-- If a task feels like it needs the whole plan, re-read its `Context you need` first — the answer is almost always there.
+- If a task feels like it needs the whole plan, re-read its `Context` first — the answer is almost always there.
 
 ## Finding the next task without loading the plan
 
-You do not need `plan.md` to know what to do next. List the task files and check their status, e.g.:
+You do not need `plan.md` to know what to do next. List the task files of the plan you're executing (`<plan-name>` is that plan's folder) and check their status, e.g.:
 
 ```bash
-for f in .opencode/plans/*/tasks/task-*.md; do
+for f in .opencode/plans/<plan-name>/tasks/task-*.md; do
   printf '%s  ' "$(grep -m1 -i 'Status' "$f")"; echo "$f"
 done | sort
 ```
@@ -43,7 +43,7 @@ Take the first file that is not `done`.
 
 ## When something is off
 
-- **Missing context:** open the one file the task points to (a specific source file, or the single `Plan reference` section) — nothing more.
+- **Missing context:** open the one file the task points to (a specific source file, or the single `Plan ref` section) — nothing more.
 - **The contract seems impossible or contradicts the code on disk:** stop and report it — name the task id and what is wrong — instead of guessing. A wrong build here gets inherited by every later task, so a small halt now is cheaper than a bad foundation.
 
 ## Running under OpenCode

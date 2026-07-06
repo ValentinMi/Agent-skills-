@@ -19,13 +19,13 @@ Keep it light: review **only the current task's diff against its one task file**
    git diff HEAD~1     # or against the commit before this task, if committed per task
    ```
    If there is no git, compare the files the task's `Files` section named against what the task asked for.
-2. **Read the task file's** `Contract`, `What to do`, `Constraints & gotchas`, and `Definition of Done`. That is your rubric — nothing else.
+2. **Read the task file's** `Contract`, `What to do` (constraints and gotchas are folded in there), and `Definition of Done`. That is your rubric — nothing else.
 
 ## Checklist (all against the task's own spec)
 
 - **Contract met exactly** — signatures, types, routes, schemas, status codes match what the task specified. No renamed or missing exports.
 - **Every Definition of Done item is truly satisfied** — verified against the actual code, not just because a box is ticked. Tick-without-truth is the most common failure.
-- **Constraints & gotchas respected** — the things the task said to match, reuse, or not touch.
+- **Constraints respected** — the gotchas folded into `What to do`: things the task said to match, reuse, or not touch.
 - **No scope creep** — the diff changes what this task owns and nothing else. Edits to unrelated files, or to things a later task owns, are a problem.
 - **Verify genuinely passed** — re-run the task's `Verify` command if unsure; a claimed pass with no evidence doesn't count.
 - **No obvious correctness bugs** in the changed lines — off-by-one, wrong error paths, leaked secrets, unhandled cases the task called out.
