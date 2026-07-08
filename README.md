@@ -1,48 +1,65 @@
 # Agent Skills
 
-Base de stock de skills pour agents IA (Claude Code, OpenCode, Claude.ai, etc.), au format [Agent Skills](https://github.com/anthropics/skills).
+A personal library of skills for AI agents (Claude Code, OpenCode, Claude.ai, etc.), in the [Agent Skills](https://github.com/anthropics/skills) format.
 
-Deux arborescences distinctes (voir [`CLAUDE.md`](CLAUDE.md) pour le détail) :
+Two separate trees (see [`CLAUDE.md`](CLAUDE.md) for the rationale):
 
-- **`skills/<nom>/`** — la bibliothèque de skills **produite** par ce repo, destinée à être déployée ailleurs (`install-skills.sh`).
-- **`.claude/skills/<nom>/`** — les skills utilisés par Claude Code **pour développer ce repo lui-même** (actuellement `skill-creator`, en fichiers réels, pas un symlink).
+- **`skills/<name>/`** — the skills library **produced** by this repo, meant to be deployed elsewhere (`install-skills.sh`).
+- **`.claude/skills/<name>/`** — the skills Claude Code uses **to work on this repo itself** (currently `skill-creator`, kept as real files, not a symlink).
 
 ```
 skills/
-├── local-agent-planner/    # Sonnet planifie → plan + tâches granulaires
-├── local-agent-executor/   # l'agent local (Qwen/OpenCode) exécute les tâches une par une
-└── local-agent-reviewer/   # relit le diff d'une tâche vs sa spec avant de la marquer done
+├── local-agent-planner/    # Sonnet plans → plan + granular tasks
+├── local-agent-executor/   # the local agent (Qwen/OpenCode) runs tasks one at a time
+└── local-agent-reviewer/   # reviews a task's diff vs its spec before marking it done
 
 .claude/skills/
-└── skill-creator/          # méta-skill Anthropic (dev-only, pas distribué)
+└── skill-creator/          # Anthropic's meta-skill (dev-only, not distributed)
+
+bench/                      # local-model behavior/quality benchmark for the skills
 ```
 
 ### local-agent-planner + executor + reviewer (workflow)
 
-Un workflow à deux modèles pour économiser un modèle fort et exploiter un modèle local :
+A two-model workflow that spares a strong model and puts a local model to work:
 
-- [`local-agent-planner`](skills/local-agent-planner/SKILL.md) — un modèle fort (Claude Sonnet) découpe une tâche de code en un `plan.md` + des fiches de tâches **auto-suffisantes** sous `.opencode/plans/<nom>/`. Les tâches donnent le *contrat + les indications*, pas le code clé en main.
-- [`local-agent-executor`](skills/local-agent-executor/SKILL.md) — un petit modèle local (Qwen sur OpenCode) implémente ces tâches **une par une**, sans jamais charger tout le plan, pour garder son contexte/RAM léger.
-- [`local-agent-reviewer`](skills/local-agent-reviewer/SKILL.md) — relit le **diff d'une tâche** face à sa spec (Contract, Definition of Done, Constraints) avant de la marquer done, et rend un verdict *APPROVE* / *CHANGES NEEDED*. Contexte léger : uniquement le diff courant + le fichier de tâche, jamais tout le plan.
+- [`local-agent-planner`](skills/local-agent-planner/SKILL.md) — a strong model (Claude Sonnet) breaks a coding task into a `plan.md` + **self-contained** task files under `.opencode/plans/<name>/`. Tasks give the *contract + hints*, not paste-ready code.
+- [`local-agent-executor`](skills/local-agent-executor/SKILL.md) — a small local model (Qwen on OpenCode) implements those tasks **one at a time**, never loading the whole plan, to keep its context/RAM light.
+- [`local-agent-reviewer`](skills/local-agent-reviewer/SKILL.md) — reviews a **task's diff** against its spec (Contract, Definition of Done, Constraints) before it is marked done, returning an *APPROVE* / *CHANGES NEEDED* verdict. Light context: only the current diff + the task file, never the whole plan.
 
-Boucle par tâche : **planifier → exécuter → vérifier → relire → marquer done**.
+Per-task loop: **plan → execute → verify → review → mark done**.
 
 ### skill-creator
 
-Le [`skill-creator`](.claude/skills/skill-creator/SKILL.md) officiel d'Anthropic : créer un skill de zéro, améliorer un skill existant, lancer des évaluations, optimiser la description (triggering), packager en `.skill`. Utilisé pour construire les skills de `skills/` — pas lui-même distribué par `install-skills.sh`.
-Source : [anthropics/skills](https://github.com/anthropics/skills/tree/main/skills/skill-creator).
+Anthropic's official [`skill-creator`](.claude/skills/skill-creator/SKILL.md): create a skill from scratch, improve an existing one, run evals, optimize the description (triggering), package into a `.skill`. Used to build the skills in `skills/` — it is not itself distributed by `install-skills.sh`.
+Source: [anthropics/skills](https://github.com/anthropics/skills/tree/main/skills/skill-creator).
 
-Chaque nouveau skill destiné à être distribué doit être ajouté dans `skills/<nom>/`.
+Every new skill meant for distribution goes in `skills/<name>/`.
 
-## Installer / mettre à jour les skills ailleurs
+## Benchmark (`bench/`)
 
-`install-skills.sh` copie les skills de `skills/` vers un dossier de skills cible (OpenCode, `.claude/skills` d'un projet, etc.). Ré-exécuter met à jour : chaque skill est **mis en miroir** (les fichiers supprimés d'un skill le sont aussi dans la cible) ; les `__pycache__`/`*.pyc` ne sont jamais copiés.
+A runnable kit that measures whether the `local-agent-*` skills actually change how a **local** model (Qwen/Ollama) behaves — you run it locally, where your model lives. Two axes:
+
+- **with_skill vs without_skill** — the `SKILL.md` body injected as the system prompt vs a generic baseline; the delta `aggregate_benchmark.py` already reports.
+- **before vs after** — run twice, then `compare.py` diffs two `benchmark.json` and exits non-zero on any per-eval regression.
+
+Results are written in the layout skill-creator's `aggregate_benchmark.py` consumes, so they open in the `eval-viewer`. A `--model mock` mode exercises the whole pipeline with no backend. Full usage in [`bench/README.md`](bench/README.md).
 
 ```bash
-./install-skills.sh <dossier-cible>                       # tous les skills
-./install-skills.sh <dossier-cible> local-agent-executor  # un skill précis
+ollama pull qwen2.5-coder:7b
+cp bench/config.example.env bench/config.env   # edit, then: source bench/config.env
+bench/bench.sh all 3
+```
 
-# exemples
+## Install / update the skills elsewhere
+
+`install-skills.sh` copies the skills from `skills/` into a target skills folder (OpenCode, a project's `.claude/skills`, etc.). Re-running it updates: each skill is **mirrored** (files removed from a skill are removed in the target too); `__pycache__`/`*.pyc` are never copied.
+
+```bash
+./install-skills.sh <target-dir>                       # all skills
+./install-skills.sh <target-dir> local-agent-executor  # a specific skill
+
+# examples
 ./install-skills.sh ~/.config/opencode/skills
-./install-skills.sh ../mon-projet/.claude/skills local-agent-planner local-agent-executor
+./install-skills.sh ../my-project/.claude/skills local-agent-planner local-agent-executor
 ```
