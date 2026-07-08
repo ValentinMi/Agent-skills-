@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "name": "clean-diff-approve",
+    "prompt": "You are reviewing the code one task produced, against that task's own spec, before it is marked done. Read the task file and the diff below. Judge only whether this diff meets this task's spec. End your response with a single verdict line: either APPROVE or CHANGES NEEDED.",
+    "fixtures": ["fixtures/reviewer/task-login.md", "fixtures/reviewer/diff-login-good.patch"],
+    "fixture_labels": {
+      "fixtures/reviewer/task-login.md": "TASK FILE",
+      "fixtures/reviewer/diff-login-good.patch": "DIFF UNDER REVIEW"
+    },
+    "expectations": [
+      {"text": "Verdict is APPROVE (the diff meets the spec)", "check": {"type": "verdict", "expected": "APPROVE"}},
+      {"text": "Does not invent unrelated style/refactor demands", "check": {"type": "llm_judge", "rubric": "The review APPROVES the change and does NOT demand unrelated style, naming, or refactor changes the task never asked for."}}
+    ],
+    "mock_response": "Contract met: /login returns 200 with a token on valid credentials and 401 on both unknown email and wrong password. All four Definition of Done items are satisfied and only src/routes/auth.ts changed.\n\nAPPROVE"
+  },
+  {
+    "id": 2,
+    "name": "dod-violation-changes-needed",
+    "prompt": "You are reviewing the code one task produced, against that task's own spec, before it is marked done. Read the task file and the diff below. Judge only whether this diff meets this task's spec. End your response with a single verdict line: either APPROVE or CHANGES NEEDED.",
+    "fixtures": ["fixtures/reviewer/task-login.md", "fixtures/reviewer/diff-login-bug.patch"],
+    "fixture_labels": {
+      "fixtures/reviewer/task-login.md": "TASK FILE",
+      "fixtures/reviewer/diff-login-bug.patch": "DIFF UNDER REVIEW"
+    },
+    "expectations": [
+      {"text": "Verdict is CHANGES NEEDED (wrong password still returns 200)", "check": {"type": "verdict", "expected": "CHANGES NEEDED"}},
+      {"text": "Names the wrong-password / 401 Definition-of-Done failure", "check": {"type": "llm_judge", "rubric": "The review identifies that a wrong password still returns 200 with a token instead of 401, i.e. the wrong-password Definition-of-Done item is unmet."}}
+    ],
+    "mock_response": "The bcrypt.compare result is computed but never checked, so a wrong password still returns 200 with a token. DoD #3 (wrong password returns 401) is unmet.\n\nCHANGES NEEDED"
+  },
+  {
+    "id": 3,
+    "name": "scope-creep-changes-needed",
+    "prompt": "You are reviewing the code one task produced, against that task's own spec, before it is marked done. Read the task file and the diff below. Judge only whether this diff meets this task's spec. End your response with a single verdict line: either APPROVE or CHANGES NEEDED.",
+    "fixtures": ["fixtures/reviewer/task-slug.md", "fixtures/reviewer/diff-slug-scopecreep.patch"],
+    "fixture_labels": {
+      "fixtures/reviewer/task-slug.md": "TASK FILE",
+      "fixtures/reviewer/diff-slug-scopecreep.patch": "DIFF UNDER REVIEW"
+    },
+    "expectations": [
+      {"text": "Verdict is CHANGES NEEDED (edits a file outside the task's scope)", "check": {"type": "verdict", "expected": "CHANGES NEEDED"}},
+      {"text": "Flags the edit to src/config/app.ts as scope creep", "check": {"type": "llm_judge", "rubric": "The review flags that src/config/app.ts was modified even though the task's Files section only allows creating src/utils/slug.ts (scope creep)."}}
+    ],
+    "mock_response": "slugify itself is correct, but the diff also edits src/config/app.ts, which is outside this task's Files (only src/utils/slug.ts). That is scope creep.\n\nCHANGES NEEDED"
+  },
+  {
+    "id": 4,
+    "name": "contract-mismatch-changes-needed",
+    "prompt": "You are reviewing the code one task produced, against that task's own spec, before it is marked done. Read the task file and the diff below. Judge only whether this diff meets this task's spec. End your response with a single verdict line: either APPROVE or CHANGES NEEDED.",
+    "fixtures": ["fixtures/reviewer/task-slug.md", "fixtures/reviewer/diff-slug-contract.patch"],
+    "fixture_labels": {
+      "fixtures/reviewer/task-slug.md": "TASK FILE",
+      "fixtures/reviewer/diff-slug-contract.patch": "DIFF UNDER REVIEW"
+    },
+    "expectations": [
+      {"text": "Verdict is CHANGES NEEDED (export/signature violate the contract)", "check": {"type": "verdict", "expected": "CHANGES NEEDED"}},
+      {"text": "Names the named-export vs default-export contract violation", "check": {"type": "llm_judge", "rubric": "The review identifies that the contract requires a named export `slugify(input: string)` but the code provides a default export `toSlug(input, sep)`, a signature/export mismatch."}}
+    ],
+    "mock_response": "The contract requires a named export slugify(input: string): string, but the diff provides a default export toSlug(input, sep). Named export missing and signature differs.\n\nCHANGES NEEDED"
+  }
+]

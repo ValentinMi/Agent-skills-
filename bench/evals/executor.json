@@ -1,0 +1,24 @@
+[
+  {
+    "id": 1,
+    "name": "ready-set-and-parallel-batch",
+    "prompt": "You are the dispatcher for a plan under .opencode/plans/build-api/. Below are the task headers (metadata + Files only — the bodies are intentionally withheld). Decide which task(s) to dispatch NEXT and how (which run in parallel vs must wait), following the dispatch rules. Do not ask to read task bodies or plan.md.\n\nTask headers:\n- task-01  Status: done       Depends on: none   Files: [src/db.ts]\n- task-02  Status: todo       Depends on: 01     Files: [src/users.ts]\n- task-03  Status: todo       Depends on: 01     Files: [src/posts.ts]\n- task-04  Status: todo       Depends on: 02     Files: [src/users.ts]\n- task-05  Status: todo       Depends on: none   Files: [src/health.ts]\n\nWhich tasks are ready right now, which do you launch as the next batch, and which must wait?",
+    "expectations": [
+      {"text": "Identifies exactly tasks 02, 03, 05 as ready", "check": {"type": "llm_judge", "rubric": "The response identifies the ready tasks as exactly 02, 03, and 05 (dependencies satisfied and status todo), and does NOT treat 04 as ready (it depends on 02 which is still todo) nor 01 (already done)."}},
+      {"text": "Respects the parallel-batch cap (<=3, default around 2)", "check": {"type": "llm_judge", "rubric": "The proposed parallel batch is at most 3 concurrent subagents (the skill default is 2, never more than 3); it does not propose launching all ready tasks with no cap."}},
+      {"text": "Batches by disjoint Files (the ready three touch different files)", "check": {"type": "llm_judge", "rubric": "The response reasons about Files being disjoint when batching in parallel; since 02/03/05 touch different files it treats them as safe to parallelize."}},
+      {"text": "Keeps the dispatcher light — no bulk reading of bodies/plan", "check": {"type": "llm_judge", "rubric": "The response does NOT propose reading the task bodies or plan.md in the dispatcher; it works from headers only and delegates each body to a subagent."}}
+    ],
+    "mock_response": "Ready now: 02, 03, 05 (deps satisfied, status todo). 04 waits (depends on 02, still todo); 01 is done. Their Files are disjoint (users.ts, posts.ts, health.ts), so I launch a parallel batch of 2 subagents (default cap) — 02 and 03 — then 05 in the next batch. Each subagent reads only its one task file; I keep the dispatcher on headers only."
+  },
+  {
+    "id": 2,
+    "name": "shared-file-forces-sequential",
+    "prompt": "You are the dispatcher for a plan under .opencode/plans/refactor-users/. Below are the task headers (metadata + Files only). Decide which task(s) to dispatch NEXT and how. Do not ask to read task bodies or plan.md.\n\nTask headers:\n- task-01  Status: todo   Depends on: none   Files: [src/users.ts]\n- task-02  Status: todo   Depends on: none   Files: [src/users.ts]\n- task-03  Status: todo   Depends on: none   Files: [src/users.ts]\n\nAll three are ready. How do you dispatch them?",
+    "expectations": [
+      {"text": "Refuses to parallelize tasks sharing src/users.ts", "check": {"type": "llm_judge", "rubric": "The response recognizes that all three tasks touch the same file (src/users.ts) and therefore must NOT run in parallel."}},
+      {"text": "Dispatches them one at a time (sequential, batch size 1)", "check": {"type": "llm_judge", "rubric": "The response dispatches the tasks sequentially / one at a time (batch size 1), each in its own fresh subagent context, rather than concurrently."}}
+    ],
+    "mock_response": "All three are ready, but their Files all point at src/users.ts — not pairwise disjoint. Two tasks that touch the same file must never run at once, so I dispatch sequentially: task-01 in its own subagent, then re-scan, then task-02, then task-03 — batch size 1. Each still gets a fresh context; the win here is isolation, not parallelism."
+  }
+]

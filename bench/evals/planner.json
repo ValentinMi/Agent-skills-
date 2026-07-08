@@ -1,0 +1,37 @@
+[
+  {
+    "id": 1,
+    "name": "health-endpoint-single-task",
+    "prompt": "Feature request: add a GET /health endpoint to an existing Express app that returns HTTP 200 with JSON {\"status\":\"ok\"}.\n\nVerified codebase facts you may rely on (do not re-explore): the server is src/server.ts, which creates `const app = express()` and calls `app.listen(3000)`; existing routes are mounted via `app.use('/api', apiRouter)` imported from src/routes/index.ts; tests run with `npm test`.\n\nBreak this into an implementation plan plus small, self-contained task file(s) under .opencode/plans/ so a low-context local model (Qwen) can implement it one task at a time. Produce plan.md and the task file(s) inline in your response.",
+    "expectations": [
+      {"text": "Targets the .opencode/plans/ output location", "check": {"type": "contains", "all": [".opencode/plans"]}},
+      {"text": "Emits at least one structured task file (Task NN / task-0N)", "check": {"type": "regex", "pattern": "task-0\\d|Task 0\\d"}},
+      {"text": "Each task ends with a Verify command and a Definition of Done", "check": {"type": "llm_judge", "rubric": "Every task in the output has both a concrete Verify command and a checkable Definition of Done."}},
+      {"text": "Specs the contract, does not paste full implementation code", "check": {"type": "llm_judge", "rubric": "The task file(s) specify the contract (route, method, status code, response shape) and describe WHAT to do, but do NOT paste a complete ready-to-run function body / full implementation of the handler."}}
+    ],
+    "mock_response": "# Plan: add /health endpoint\n\nOutput under .opencode/plans/add-health-endpoint/\n\n## Task index\n| ID | Task | Depends on |\n| 01 | Add GET /health route | - |\n\n---\n# Task 01 - Add GET /health route\n- ID: 01 - Depends on: none - Status: todo\n\n## Contract\nGET /health -> 200, JSON { status: \"ok\" }\n\n## What to do\nRegister a GET /health handler on `app` in src/server.ts before app.listen, returning 200 with { status: 'ok' }. Match the existing app.use routing style.\n\n## Definition of Done\n- [ ] GET /health returns 200 { status: 'ok' }\n- [ ] Verify passes\n\n## Verify\n```bash\nnpm test -- health\n```"
+  },
+  {
+    "id": 2,
+    "name": "jwt-auth-multi-task",
+    "prompt": "Feature request: add email+password authentication with JWT to an existing Express + Postgres app. Users must be able to register (hash the password) and log in (verify password, return a JWT), and a middleware must protect GET /me.\n\nVerified codebase facts (do not re-explore): users live in src/db/users.ts exposing `createUser(email, passwordHash)` and `findUserByEmail(email)`; routes are in src/routes/auth.ts (currently only /register stub) and src/routes/me.ts; `bcrypt` and `jsonwebtoken` are already dependencies; tests run with `npm test`.\n\nBreak this into an implementation plan plus small, self-contained task files under .opencode/plans/ for a low-context local model to implement one at a time. Produce plan.md and the task files inline.",
+    "expectations": [
+      {"text": "Targets the .opencode/plans/ output location", "check": {"type": "contains", "all": [".opencode/plans"]}},
+      {"text": "Splits into multiple tasks with explicit dependencies", "check": {"type": "llm_judge", "rubric": "The plan is split into MULTIPLE task files (at least three), and later tasks declare their prerequisites by task ID (a Depends on field)."}},
+      {"text": "One concern per task, not everything bundled into one", "check": {"type": "llm_judge", "rubric": "Each task covers a single concern (e.g. hashing, register route, login route, protect /me are separate tasks) rather than one giant task doing everything at once."}},
+      {"text": "Contract-level specs, no pasted full implementations", "check": {"type": "llm_judge", "rubric": "Tasks pin down contracts (signatures, routes, status codes) and describe what to do, but do NOT paste complete ready-to-run function bodies for the handlers."}}
+    ],
+    "mock_response": "Output under .opencode/plans/add-jwt-auth/\n\n# Task 01 - Password hashing helper (Depends on: none)\nContract: hashPassword(pw: string): Promise<string> using bcrypt SALT_ROUNDS=10. Verify: npm test -- hash\n\n# Task 02 - Register route (Depends on: 01)\nContract: POST /register {email,password} -> 201 {id}. Hash via task 01 helper, createUser. Verify: npm test -- register\n\n# Task 03 - Login route (Depends on: 01)\nContract: POST /login {email,password} -> 200 {token} / 401. bcrypt.compare then signToken. Verify: npm test -- login\n\n# Task 04 - Protect GET /me (Depends on: 03)\nContract: requireAuth middleware verifies JWT, 401 on missing/invalid. Verify: npm test -- me"
+  },
+  {
+    "id": 3,
+    "name": "resists-writing-code-itself",
+    "prompt": "I want a rate limiter on my Express API: max 100 requests per IP per 15 minutes, returning 429 when exceeded. The app is src/server.ts (`const app = express()`), and `express-rate-limit` is already installed; tests run with `npm test`. Plan this out into tasks for my local model under .opencode/plans/ — I will have the local model write the actual code, so hand it off, don't implement it yourself.",
+    "expectations": [
+      {"text": "Targets the .opencode/plans/ output location", "check": {"type": "contains", "all": [".opencode/plans"]}},
+      {"text": "Produces a task hand-off, not a finished implementation", "check": {"type": "llm_judge", "rubric": "The response hands the work off as a task spec for a local model to implement. It does NOT itself write the complete, ready-to-paste rate-limiter implementation as the deliverable."}},
+      {"text": "Task carries a verifiable Definition of Done", "check": {"type": "llm_judge", "rubric": "The task includes a checkable Definition of Done and a concrete Verify command (e.g. that a 101st request within the window returns 429)."}}
+    ],
+    "mock_response": "Output under .opencode/plans/add-rate-limit/\n\n# Task 01 - Add rate limiting middleware (Depends on: none)\nContract: apply express-rate-limit to `app` in src/server.ts, windowMs=15*60*1000, max=100, 429 on exceed. Mount before routes.\nWhat to do: configure express-rate-limit with those options and app.use it. Do not change route handlers.\nDefinition of Done: [ ] 101st request from one IP within 15 min returns 429. [ ] Verify passes.\nVerify: npm test -- rate-limit"
+  }
+]

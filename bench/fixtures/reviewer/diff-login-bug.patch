@@ -1,0 +1,21 @@
+diff --git a/src/routes/auth.ts b/src/routes/auth.ts
+index 1a2b3c4..5d6e7f8 100644
+--- a/src/routes/auth.ts
++++ b/src/routes/auth.ts
+@@ -12,6 +12,19 @@ router.post("/register", async (req, res) => {
+   res.status(201).json({ id: user.id });
+ });
+
++router.post("/login", async (req, res) => {
++  const { email, password } = req.body;
++  const user = await findUserByEmail(email);
++  if (!user) {
++    return res.status(401).json({ error: "invalid credentials" });
++  }
++  const ok = await bcrypt.compare(password, user.passwordHash);
++  // BUG: returns a token even when the password does not match
++  const token = signToken(user.id);
++  return res.status(200).json({ token });
++});
++
+ export default router;

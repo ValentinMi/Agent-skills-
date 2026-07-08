@@ -81,8 +81,26 @@ python -m scripts.run_loop  --skill-path <path> --eval-set <evals.json> --model 
 python -m scripts.package_skill <path-to-skill>
 ```
 
+## Benchmark tooling (in `bench/`)
+
+`bench/` is a **third tree**, separate from the two above: a runnable kit that measures whether the `local-agent-*` skills change how a **local** model (Qwen/Ollama) behaves. It is neither a shipped skill (`skills/`) nor a dev-time skill (`.claude/skills/`) — it is repo tooling, and `install-skills.sh` never touches it. Stdlib-only Python, no dependencies.
+
+- **What it measures — two axes.** `with_skill` vs `without_skill` (the skill's `SKILL.md` body injected as the system prompt vs a generic baseline — the only variable), and `before` vs `after` (run twice across a skill edit, then `compare.py` diffs the two `benchmark.json` and exits non-zero on any per-eval regression).
+- **How a "skill" is operationalized:** a local model has no skill-loading mechanism, so a skill is just injected instructions. `with_skill` = SKILL.md body as system prompt; `without_skill` = generic baseline.
+- **Output format is deliberately the one `aggregate_benchmark.py` consumes** (`eval-<id>/<config>/run-<k>/grading.json`), so results flow into the existing `eval-viewer`. Don't change that shape without updating the aggregator.
+- **Grading:** deterministic checks (`verdict`/`contains`/`not_contains`/`regex`) are reliable; the `llm_judge` check is only as good as `JUDGE_MODEL` and **fails closed** if the judge is unreachable/unparseable.
+- **`--model mock`** skips the backend (returns each eval's `mock_response`, mocks the judge) so the run → grade → aggregate → compare plumbing is verifiable with **no model present** — this is how to test the kit in this remote environment, where no Qwen/Ollama exists.
+- **The `executor` evals are a text proxy** for a tool/subagent-driven dispatcher — they check dispatch *reasoning* (ready-set, concurrency cap, disjoint-Files batching), not real subagent execution. `planner` evals feed verified codebase facts inline since the harness can't let the model explore a real repo.
+
+```bash
+python bench/run_bench.py --skill reviewer --runs 1 --model mock   # plumbing test, no backend
+bench/bench.sh all 3            # run all skills against BENCH_MODEL, then aggregate each
+```
+
+Generated run outputs live under `bench/results/` (gitignored). See `bench/README.md` for full usage.
+
 ## Conventions
 
-- Skill bodies and generated artifacts are written in **English**; repo prose (README) may be French.
+- Skill bodies and generated artifacts are written in **English**. Repo prose (README, `bench/` docs) is also English.
 - `.gitignore` excludes `__pycache__/` and `*.pyc` — don't commit compiled Python.
 - `install-skills.sh <target-dir> [skill-name ...]` deploys/updates skills from `skills/` into an external skills folder (e.g. an OpenCode install or another project's `.claude/skills`). Re-running it mirrors each skill (stale files removed), so install and update are the same command.
