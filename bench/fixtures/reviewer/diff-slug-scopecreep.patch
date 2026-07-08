@@ -1,0 +1,22 @@
+diff --git a/src/utils/slug.ts b/src/utils/slug.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/utils/slug.ts
+@@ -0,0 +1,6 @@
++export function slugify(input: string): string {
++  return input
++    .toLowerCase()
++    .replace(/[^a-z0-9]+/g, "-")
++    .replace(/^-+|-+$/g, "");
++}
+diff --git a/src/config/app.ts b/src/config/app.ts
+index 2222222..3333333 100644
+--- a/src/config/app.ts
++++ b/src/config/app.ts
+@@ -3,5 +3,6 @@ export const config = {
+   port: 3000,
+-  logLevel: "info",
++  logLevel: "debug",
++  featureFlags: { newSlugs: true },
+ };

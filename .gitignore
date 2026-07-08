@@ -1,2 +1,6 @@
 __pycache__/
 *.pyc
+
+# Benchmark run outputs (transcripts, grading.json, benchmark.json/.md) — regenerated per run
+bench/results/
+bench/config.env
