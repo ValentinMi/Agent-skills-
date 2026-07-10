@@ -13,8 +13,8 @@ You act as the **dispatcher**: for every task you launch a **subagent** whose en
 
 Repeat until every task is `done`:
 
-1. **Scan headers only.** For each `tasks/task-*.md`, read just the metadata line (`ID`, `Depends on`, `Status`) and the `Files` list. **Never read task bodies, `plan.md`, or task output in the dispatcher** — your context must stay near-empty so you can run the whole plan without resetting.
-2. **Find the ready tasks.** A task is *ready* when its `Status` is `todo` and every ID in `Depends on` is `done`.
+1. **Scan headers only.** For each `tasks/task-*.md`, read just the metadata line (`ID`, `Depends on`, `Status`), the `Side effects` line if present, and the `Files` list. **Never read task bodies, `plan.md`, or task output in the dispatcher** — your context must stay near-empty so you can run the whole plan without resetting.
+2. **Find the ready tasks.** A task is *ready* when its `Status` is `todo` and every ID in `Depends on` is `done`. A task already `in-progress` with no subagent running means a previous run died mid-task — do **not** silently redispatch it: the working tree may hold its partial work. Surface it to the user (inspect or reset the partial changes), then set it back to `todo`.
 3. **Build a parallel batch.** From the ready tasks, keep only those whose `Files` lists are **pairwise disjoint** — two tasks that touch the same file never run at the same time. Cap the batch size (see the performance rules below).
 4. **Launch one subagent per task in the batch, in parallel.** Each subagent's instructions: "Execute `.opencode/plans/<plan-name>/tasks/task-NN-<slug>.md` following the 'What each subagent does' steps. Read only that file plus the source files it names. Report done or blocked, in one or two sentences."
 5. **Wait for the whole batch to finish.** Read only each subagent's short final report — not its transcript. Completions unlock new tasks, so go back to step 1 and re-scan.
@@ -26,17 +26,17 @@ Parallel subagents are only a win if the machine can actually serve them. On a l
 
 - **Default cap: 2 subagents in parallel. Never exceed 3**, even if more tasks are ready — the leftover ready tasks simply go in the next batch.
 - **Drop to 1 (sequential) when:** the machine is RAM/VRAM-tight, tasks look heavy (large `Files` lists, big contracts), the backend is known to serialize requests, or you're unsure. Sequential-through-subagents keeps the main benefit — a fresh context per task — and a correct sequential run always beats a thrashing parallel one.
-- **Serialize on shared side effects.** Even with disjoint `Files`, two `Verify` commands can collide — a dev server on the same port, the same database, the full test suite writing shared artifacts. If two ready tasks' verify steps could interfere, put them in different batches.
+- **Serialize on shared side effects.** Even with disjoint `Files`, two `Verify` commands can collide — a dev server on the same port, the same database, the full test suite writing shared artifacts. Check each task's `Side effects` header line: two ready tasks declaring the same resource go in different batches. If the plan predates that field, grep just each task's `Verify` line (that one line, not the body) before parallelizing.
 - **Don't shrink batches to 1 task "to be safe" when tasks are small and independent** — two light, disjoint tasks in parallel is the sweet spot this skill aims for.
 
 ## What each subagent does (one task, start to finish)
 
-1. **Open only your one task file.** Read it fully — it is small by design.
+1. **Open only your one task file.** Read it fully — it is small by design. First edit: set its `Status` to `in-progress`, so a crash mid-task is visible instead of leaving a half-done task marked `todo`.
 2. **Do not open `plan.md` or any other task file.** Everything you need is in this task's `Context`, `Contract`, and `What to do`. Only if you are genuinely stuck, open the single section named in `Plan ref` — never the whole plan.
 3. **Check `Depends on`.** Those tasks are already done and their code is on disk. If you need to see what they produced, open that specific **source file**, not its task file.
 4. **Write the code** to satisfy the `Contract` and `What to do`. Respect the constraints and gotchas folded into `What to do`.
-5. **Run the `Verify` command.** If it fails, fix it within this task and re-run until it passes.
-6. **Mark the task done.** If the workflow uses `local-agent-reviewer`, request its review of this task's diff first — only mark `done` on an **APPROVE** verdict; on **CHANGES NEEDED**, apply the fixes, re-run `Verify`, and get re-reviewed. Otherwise, tick the `Definition of Done` boxes and set the task's `Status` to `done` directly.
+5. **Run the `Verify` command.** If it fails, fix it within this task and re-run — but cap at **three fix attempts**. If the third still fails, stop and report blocked with the failure: a model that hasn't converged in three tries won't on the tenth, and looping starves the rest of the plan.
+6. **Mark the task done.** If the workflow uses `local-agent-reviewer`, request its review of this task's diff first — scoped to this task's `Files` paths (`git diff -- <those paths>`), because under a parallel batch the working tree also holds *other* tasks' in-flight edits. Only mark `done` on an **APPROVE** verdict; on **CHANGES NEEDED**, apply the fixes, re-run `Verify`, and get re-reviewed — at most **two re-review rounds**, then report blocked with the reviewer's findings. Otherwise, tick the `Definition of Done` boxes and set the task's `Status` to `done` directly.
 7. **Report back in one or two sentences** — "task NN done, verify passing" or "task NN blocked: <why>". Never paste your transcript or the code into the report; the dispatcher must stay light.
 
 ## Keep your context light (the RAM rule)
@@ -52,9 +52,10 @@ You do not need `plan.md` to know what is ready. List the task files of the plan
 
 ```bash
 for f in .opencode/plans/<plan-name>/tasks/task-*.md; do
-  printf '%s | %s | %s\n' "$f" \
+  printf '%s | %s | %s | %s\n' "$f" \
     "$(grep -m1 -i 'Status' "$f")" \
-    "$(grep -m1 -i 'Depends on' "$f")"
+    "$(grep -m1 -i 'Depends on' "$f")" \
+    "$(grep -m1 -i 'Side effects' "$f")"
 done
 ```
 

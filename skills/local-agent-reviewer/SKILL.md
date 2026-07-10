@@ -13,11 +13,16 @@ Keep it light: review **only the current task's diff against its one task file**
 
 ## What to review
 
-1. **Get the diff** for this task — the code that changed since the task started:
+1. **Get the diff** for this task — the code that changed since the task started, **scoped to the paths in the task's `Files` section**:
    ```bash
-   git diff            # if the repo uses git and the task's changes are unstaged
-   git diff HEAD~1     # or against the commit before this task, if committed per task
+   git diff -- <paths from Files>            # unstaged changes, this task only
+   git diff HEAD~1 -- <paths from Files>     # or vs the prior commit, if committed per task
    ```
+   Always scope: the executor may run other tasks in parallel, so the raw
+   working-tree diff can contain *another* task's in-flight changes — an unscoped
+   diff judges this task on someone else's code. (Changes to files *outside* the
+   task's `Files` are still findable: `git diff --stat` names them without loading
+   their content — see the scope-creep check.)
    If there is no git, compare the files the task's `Files` section named against what the task asked for.
 2. **Read the task file's** `Contract`, `What to do` (constraints and gotchas are folded in there), and `Definition of Done`. That is your rubric — nothing else.
 
@@ -26,7 +31,7 @@ Keep it light: review **only the current task's diff against its one task file**
 - **Contract met exactly** — signatures, types, routes, schemas, status codes match what the task specified. No renamed or missing exports.
 - **Every Definition of Done item is truly satisfied** — verified against the actual code, not just because a box is ticked. Tick-without-truth is the most common failure.
 - **Constraints respected** — the gotchas folded into `What to do`: things the task said to match, reuse, or not touch.
-- **No scope creep** — the diff changes what this task owns and nothing else. Edits to unrelated files, or to things a later task owns, are a problem.
+- **No scope creep** — the diff changes what this task owns and nothing else. Check `git diff --stat` for changed files beyond the task's `Files` paths. Caveat under parallel execution: an extra file may be *another* in-flight task's legitimate work — if the change is clearly part of this task's feature, it's scope creep (reject); if it looks like a separate concern, report it as an unattributed change for the dispatcher to sort out instead of blocking this task on it.
 - **Verify genuinely passed** — re-run the task's `Verify` command if unsure; a claimed pass with no evidence doesn't count.
 - **No obvious correctness bugs** in the changed lines — off-by-one, wrong error paths, leaked secrets, unhandled cases the task called out.
 
@@ -36,6 +41,8 @@ End with one of two clear outcomes:
 
 - **APPROVE** — the task meets its spec. Say so plainly; the task can be marked `done`.
 - **CHANGES NEEDED** — list concrete, minimal fixes, each tied to a spec item (e.g. "DoD #2 unmet: `/login` returns 200 with no token on bad password; should be 401"). Hand these back to the executor to fix, then review again. Keep the list short and actionable — don't rewrite the code yourself, and don't pile on style opinions the task never asked for.
+
+If the same task comes back still failing after **two fix rounds**, stop the loop: flag the task for a human (or the planner) with your remaining findings. Non-convergence at that point is a spec or capability problem, not a polish problem — a third round just burns the machine.
 
 ## When the spec itself looks wrong
 

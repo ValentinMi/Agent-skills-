@@ -45,9 +45,10 @@ Your tokens are the scarce resource — spend the fewest that still make each ta
 1. **One concern per task.** One module, one route/behaviour, or one tightly-coupled pair (impl + its test). The small model's typical failure isn't bad code — it's *dropping a requirement while juggling several*. "Add hashing AND a login route AND protect the list" is where it does two of three and silently skips one. So bundle only trivial changes that share the exact same context; otherwise one behaviour per task. Smaller tasks also give sharper verification — when something breaks you know which task.
 2. **Self-contained.** Everything to execute goes in the task file: objective, minimal context, exact paths, contract, what to do (not paste-ready code), how to verify. Never needs the plan or a codebase tour.
 3. **Contract, not implementation.** Pin the boundary exactly — paths, signatures, routes, types, schemas, commands — because the executor can't safely improvise these and they must match across tasks. Then stop: describe *what the code must do*, let it write the body. Signature + behaviour + constraints is the sweet spot.
-4. **Verifiable.** Every task ends with a checkable Definition of Done and a concrete verify command. The executor wrote the code, not you — the verify step is how a weaker model catches its own mistakes.
+4. **Verifiable.** Every task ends with a checkable Definition of Done and a concrete verify command. The executor wrote the code, not you — the verify step is how a weaker model catches its own mistakes. If the repo has no test infra yet, make bootstrapping it an early task, or verify with a command that already exists (build, a smoke run) — a Verify that fails for reasons outside the task reads as a false block.
 5. **Explicit dependencies.** Each task lists prerequisites by ID and states what it can assume is already present.
 6. **Right-sized.** Fits one focused pass of a limited window. If context or steps won't fit comfortably, split.
+7. **`Files` is a concurrency contract.** The executor dispatches tasks with disjoint `Files` lists *in parallel* — an omitted file can put two subagents in the same file at once. List every file the task will create or modify, including easy-to-forget ones (barrel/index re-exports, config, migrations). Likewise, if the `Verify` step touches a shared resource (a dev server port, a database, the full test suite), declare it on the task's `Side effects` line so the dispatcher can keep colliding verifies in separate batches.
 
 ## The code-vs-spec dial
 
@@ -89,10 +90,13 @@ libraries, things to avoid. Bullets.>
 - Other: <naming, layout, error handling>
 
 ## Task index
-| ID | Task | Depends on | Status |
-|----|------|-----------|--------|
-| 01 | <title> | — | [ ] |
-| 02 | <title> | 01 | [ ] |
+| ID | Task | Depends on |
+|----|------|-----------|
+| 01 | <title> | — |
+| 02 | <title> | 01 |
+
+<!-- Progress lives in each task file's Status field — the single source of
+truth. Don't duplicate it here: nothing updates plan.md during execution. -->
 
 ## Task 01 — <title>
 <A few sentences on this task's slice — the fallback detail its task file points
@@ -107,6 +111,7 @@ Write it terse — fragments and signatures, not paragraphs. Omit any section th
 # Task 01 — <title>
 
 - **ID:** 01 · **Depends on:** <IDs or none> · **Plan ref:** plan.md § Task 01 · **Status:** todo
+- **Side effects:** <none, or the shared resources Verify touches: port 3000, test DB, full suite>
 
 ## Objective
 <1 sentence.>
@@ -117,6 +122,8 @@ data shapes, what prior tasks produced that you rely on. If earlier tasks edited
 this file, describe its state AFTER those edits.>
 
 ## Files
+<Exhaustive — every file this task creates or modifies. The executor parallelizes
+on disjoint Files, so a missing entry can cause two tasks to edit one file at once.>
 - Create/Modify: `<path>` — <what changes>
 
 ## Contract
@@ -147,6 +154,7 @@ if genuinely tricky/security-sensitive; say why.>
 - [ ] Contract specified, body left to the executor — no paste-ready implementations (bar a justified tricky fragment).
 - [ ] Every path, signature, and command is real, not invented.
 - [ ] One concern per task, right-sized for a limited window; splits justified by correctness, not reflex.
+- [ ] `Files` exhaustive; `Side effects` declared wherever Verify touches a shared resource.
 - [ ] Dependencies by ID; order consistent.
 - [ ] Each task has a Definition of Done and a verify command.
 - [ ] plan.md chapters map 1:1 to task files.
